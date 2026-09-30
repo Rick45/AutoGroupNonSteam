@@ -1,6 +1,6 @@
 {
   "name": "non-steam-collection",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Decky Loader plugin that maintains a collection of non-Steam shortcuts",
   "type": "module",
   "scripts": {
