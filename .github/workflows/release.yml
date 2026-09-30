@@ -1,0 +1,118 @@
+name: Publish plugin release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Semantic version component to increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the default branch
+        env:
+          CURRENT_BRANCH: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$CURRENT_BRANCH" != "$DEFAULT_BRANCH" ]; then
+            echo "Run this workflow from the default branch ($DEFAULT_BRANCH)." >&2
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Increment version
+        id: version
+        env:
+          VERSION_BUMP: ${{ inputs.version_bump }}
+        run: |
+          npm version "$VERSION_BUMP" --no-git-tag-version
+          version=$(node --print "require('./package.json').version")
+          echo "number=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Validate backend
+        run: python3 -m py_compile main.py
+
+      - name: Package Decky plugin
+        env:
+          PLUGIN_VERSION: ${{ steps.version.outputs.number }}
+        run: |
+          package_root="$RUNNER_TEMP/package/Non-Steam Collection"
+          mkdir -p "$package_root/dist" "$package_root/assets" "$package_root/defaults" out
+          cp dist/index.js "$package_root/dist/index.js"
+          cp assets/logo.png "$package_root/assets/logo.png"
+          cp defaults/defaults.txt "$package_root/defaults/defaults.txt"
+          cp main.py package.json plugin.json README.md LICENSE "$package_root/"
+          cd "$RUNNER_TEMP/package"
+          zip -q -r "$GITHUB_WORKSPACE/out/Non-Steam-Collection.zip" "Non-Steam Collection"
+          cd "$GITHUB_WORKSPACE"
+          unzip -t out/Non-Steam-Collection.zip
+          cd out
+          sha256sum Non-Steam-Collection.zip > "Non-Steam-Collection-v${PLUGIN_VERSION}.sha256"
+
+      - name: Commit version and create tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.number }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "Release v$RELEASE_VERSION"
+          git tag "$RELEASE_TAG"
+          git push --atomic origin "HEAD:refs/heads/$BRANCH_NAME" "refs/tags/$RELEASE_TAG"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            out/Non-Steam-Collection.zip \
+            out/Non-Steam-Collection-*.sha256 \
+            --title "Non-Steam Collection $RELEASE_TAG" \
+            --generate-notes \
+            --verify-tag

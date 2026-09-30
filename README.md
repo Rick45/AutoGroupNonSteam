@@ -25,7 +25,13 @@ The Rollup build writes the frontend bundle to `dist/index.js`.
 
 ## Install from ZIP on Steam Deck
 
-Use the packaged `out/Non-Steam-Collection-v1.0.0.zip` file:
+Download `Non-Steam-Collection.zip` from the
+[latest GitHub release](https://github.com/Rick45/AutoGroupNonSteam/releases/latest),
+or use a locally packaged ZIP from `out/`:
+
+```text
+https://github.com/Rick45/AutoGroupNonSteam/releases/latest/download/Non-Steam-Collection.zip
+```
 
 1. Open Decky Loader settings from the Quick Access menu.
 2. Enable **Developer mode**.
@@ -34,6 +40,14 @@ Use the packaged `out/Non-Steam-Collection-v1.0.0.zip` file:
 5. Open **Non-Steam Collection** from the Decky plugin list and press **Sync Now**.
 
 If the plugin does not appear immediately, restart Steam or restart `plugin_loader`.
+
+## Publishing a Release
+
+Releases are created only on demand. In GitHub, open **Actions**, select
+**Publish plugin release**, choose **Run workflow**, and select a patch, minor,
+or major version increment. The workflow updates `package.json`, builds and
+validates the plugin, commits the new version, creates the matching `vX.Y.Z`
+tag, and publishes `Non-Steam-Collection.zip` in a GitHub Release.
 
 ### Manual development install
 
