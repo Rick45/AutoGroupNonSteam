@@ -1,57 +1,54 @@
+import json
 import os
+from typing import Any
 
-# The decky plugin module is located at decky-loader/plugin
-# For easy intellisense checkout the decky-loader code repo
-# and add the `decky-loader/plugin/imports` path to `python.analysis.extraPaths` in `.vscode/settings.json`
 import decky
-import asyncio
+
 
 class Plugin:
-    # A normal method. It can be called from the TypeScript side using @decky/api.
-    async def add(self, left: int, right: int) -> int:
-        return left + right
+    _settings_file = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "settings.json")
 
-    async def long_running(self):
-        await asyncio.sleep(15)
-        # Passing through a bunch of random data, just as an example
-        await decky.emit("timer_event", "Hello from the backend!", True, 2)
+    def _read_settings(self) -> dict[str, bool]:
+        defaults = {"automatic_sync": True}
+        try:
+            with open(self._settings_file, "r", encoding="utf-8") as settings_file:
+                data = json.load(settings_file)
+            if isinstance(data, dict) and isinstance(data.get("automatic_sync"), bool):
+                return {"automatic_sync": data["automatic_sync"]}
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError, TypeError) as error:
+            decky.logger.warning("Could not read settings; using defaults: %s", error)
+        return defaults
 
-    # Asyncio-compatible long-running code, executed in a task when the plugin is loaded
-    async def _main(self):
-        self.loop = asyncio.get_event_loop()
-        decky.logger.info("Hello World!")
+    def _write_settings(self, settings: dict[str, bool]) -> None:
+        os.makedirs(decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
+        temporary_file = f"{self._settings_file}.tmp"
+        with open(temporary_file, "w", encoding="utf-8") as settings_file:
+            json.dump(settings, settings_file, indent=2)
+            settings_file.write("\n")
+        os.replace(temporary_file, self._settings_file)
 
-    # Function called first during the unload process, utilize this to handle your plugin being stopped, but not
-    # completely removed
-    async def _unload(self):
-        decky.logger.info("Goodnight World!")
-        pass
+    async def get_settings(self) -> dict[str, bool]:
+        return self._read_settings()
 
-    # Function called after `_unload` during uninstall, utilize this to clean up processes and other remnants of your
-    # plugin that may remain on the system
-    async def _uninstall(self):
-        decky.logger.info("Goodbye World!")
-        pass
+    async def set_automatic_sync(self, enabled: bool) -> dict[str, bool]:
+        settings = {"automatic_sync": bool(enabled)}
+        self._write_settings(settings)
+        decky.logger.info("Automatic synchronization set to %s", settings["automatic_sync"])
+        return settings
 
-    async def start_timer(self):
-        self.loop.create_task(self.long_running())
+    async def write_log(self, level: str, message: Any) -> None:
+        log_method = {
+            "debug": decky.logger.debug,
+            "info": decky.logger.info,
+            "warning": decky.logger.warning,
+            "error": decky.logger.error,
+        }.get(level, decky.logger.info)
+        log_method("%s", str(message))
 
-    # Migrations that should be performed before entering `_main()`.
-    async def _migration(self):
-        decky.logger.info("Migrating")
-        # Here's a migration example for logs:
-        # - `~/.config/decky-template/template.log` will be migrated to `decky.decky_LOG_DIR/template.log`
-        decky.migrate_logs(os.path.join(decky.DECKY_USER_HOME,
-                                               ".config", "decky-template", "template.log"))
-        # Here's a migration example for settings:
-        # - `~/homebrew/settings/template.json` is migrated to `decky.decky_SETTINGS_DIR/template.json`
-        # - `~/.config/decky-template/` all files and directories under this root are migrated to `decky.decky_SETTINGS_DIR/`
-        decky.migrate_settings(
-            os.path.join(decky.DECKY_HOME, "settings", "template.json"),
-            os.path.join(decky.DECKY_USER_HOME, ".config", "decky-template"))
-        # Here's a migration example for runtime data:
-        # - `~/homebrew/template/` all files and directories under this root are migrated to `decky.decky_RUNTIME_DIR/`
-        # - `~/.local/share/decky-template/` all files and directories under this root are migrated to `decky.decky_RUNTIME_DIR/`
-        decky.migrate_runtime(
-            os.path.join(decky.DECKY_HOME, "template"),
-            os.path.join(decky.DECKY_USER_HOME, ".local", "share", "decky-template"))
+    async def _main(self) -> None:
+        decky.logger.info("Non-Steam Collection backend started")
+
+    async def _unload(self) -> None:
+        decky.logger.info("Non-Steam Collection backend stopped")

@@ -1,11 +1,11 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
-  "flags": ["debug", "_root"],
+  "name": "Non-Steam Collection",
+  "author": "Rick45",
+  "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": ["library", "collections", "non-steam"],
+    "description": "Automatically keeps every non-Steam shortcut in one Steam collection.",
+    "image": "https://raw.githubusercontent.com/Rick45/AutoGroupNonSteam/main/assets/logo.png"
   }
 }
